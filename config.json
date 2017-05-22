@@ -1,5 +1,5 @@
 {
-    "broker_server": "78.194.220.232",
+    "broker_server": "127.0.0.1",
     "user":"None",
     "password":"None",
     "ssl":false,

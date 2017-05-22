@@ -17,7 +17,7 @@ class Electrolink:
         self.callbacks = {
                   "ping":         {"call": self.ping,          "parameters": None,         "description": "Verify if board responds, will respond 1"},
                   "getInfo":      {"call": self.getInfo,       "parameters": None,         "description": "Get board info"}, 
-                  "getCallbacks": {"call": self.getCallbacks,  "parameters": None,         "description": "Get available instructions to call"},
+                  "getServices":  {"call": self.getServices,   "parameters": None,         "description": "Get available instructions to call"},
                   "reset":        {"call": self.reset,         "parameters": None,         "description": "Hardware reset electronics"},
                   "setAckReceipt":{"call": self.setAckReceipt, "parameters": "true/false", "description": "Avis de reception"}
                   }
@@ -34,6 +34,17 @@ class Electrolink:
         self.ANSWER_TOPIC =  self.CLIENT_ID+"/reply"
         # Error tocpi is used to explain what caused error
         self.ERROR_TOPIC =   self.CLIENT_ID+"/error"
+        self.COMMON_TOPIC = b"common/command"
+        self.COMMON_REPLY_TOPIC = b"common/reply"
+
+        self.info["command"] = self.REQUEST_TOPIC
+        self.info["reply"]   = self.ANSWER_TOPIC
+        self.info["error"]   = self.ERROR_TOPIC
+
+        self.info["common_command"]  = self.COMMON_TOPIC
+        self.info["common_reply"]  = self.COMMON_REPLY_TOPIC
+
+        self.info["version"] = "1.0"
 
     # Connects to broker using native mqtt interface
     # Aftr connexion subscription to command topic will be done
@@ -48,6 +59,7 @@ class Electrolink:
 
         self.client.connect()
         self.client.subscribe(self.REQUEST_TOPIC)
+        self.client.subscribe(self.COMMON_TOPIC)
 
     # This is BLOCKING function, it will wait until gets new message to continue execution
     def waitForMessage(self):
@@ -62,6 +74,11 @@ class Electrolink:
         data = loads(msg)
         method = data["method"]
         params = data["params"]
+
+        print(topic, msg, self.COMMON_TOPIC)
+        ANSWER = self.ANSWER_TOPIC
+        if (topic in self.COMMON_TOPIC) :
+            ANSWER = self.COMMON_REPLY_TOPIC
 
         # Detect if we are in mode like jsonrpc with id for each message
         msgId = None
@@ -82,14 +99,14 @@ class Electrolink:
                 if not(msgId is None):
                     p["id"] = msgId
                 out = dumps(p)
-                self.client.publish(self.ANSWER_TOPIC, out)
+                self.client.publish(ANSWER, out)
             else :
                 if (self.ackReceipt is True):
                     p = {"requested":method, "params":params, "value":"OK"} #pass back params to client
                     if not(msgId is None):
                         p["id"] = msgId
                     out = dumps(p)
-                    self.client.publish(self.ANSWER_TOPIC, out)
+                    self.client.publish(ANSWER, out)
 
         # These are common errors
         except IndexError:
@@ -112,7 +129,7 @@ class Electrolink:
         self.callbacks.update(newCallbacks)
 
     # Returns list of available functions that can be called
-    def getCallbacks(self, arg):
+    def getServices(self, arg):
         # Ignore call from the dictionary when sending
         # It's not trivial to make copy of dictionary in micropython
         # This is manual method
@@ -140,7 +157,7 @@ class Electrolink:
 
     # Returns number 1 to show that he is alive
     def ping(self, arg):
-        return 1
+        return self.CLIENT_ID
 
     def reset(self, arg):
         import machine
